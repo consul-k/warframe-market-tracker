@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Warframe Market Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center">
+    <div class="card shadow-sm p-5 text-center" style="max-width: 600px; width: 100%;">
+
+        <h1 class="mb-3">Warframe Market Tracker</h1>
+        <p class="text-muted mb-4">
+            Автоматическое отслеживание цен предметов с Warframe.Market<br>
+            Получайте уведомления в Telegram при достижении целевой цены.
+        </p>
+
+        <div class="d-grid gap-3">
+            <a href="{% url 'tracker-add' %}" class="btn btn-primary btn-lg">
+                ➕ Добавить предмет
+            </a>
+
+            <a href="{% url 'tracker-items' %}" class="btn btn-outline-secondary btn-lg">
+                📋 Список отслеживаемых
+            </a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

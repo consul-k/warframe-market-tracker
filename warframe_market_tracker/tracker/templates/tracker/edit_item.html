@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% block title %}Редактировать предмет{% endblock %}
+{% block content %}
+<div class="card shadow-sm p-4">
+    <h2 class="mb-4 text-center">Редактировать предмет</h2>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+        <!-- Скрытое поле item_url_name -->
+         <input type="hidden" name="name" value="{{ item.name }}">
+        {{ form.item_url_name }}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {% for err in form.non_field_errors %}
+                    <div>{{ err }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <!-- Название (заблокировано) -->
+        <div class="mb-3">
+            <label class="form-label fw-bold">Название предмета</label>
+            <p class="form-control-plaintext">{{ item.name }}</p>
+        </div>
+
+        <!-- Целевая цена -->
+        <div class="mb-3">
+            {{ form.target_price.label_tag }}
+            {{ form.target_price }}
+            {% for err in form.target_price.errors %}
+                <div class="text-danger small mt-1">{{ err }}</div>
+            {% endfor %}
+        </div>
+
+        <!-- Telegram chat ID -->
+        <div class="mb-3">
+            {{ form.chat_id.label_tag }}
+            {{ form.chat_id }}
+            {% for err in form.chat_id.errors %}
+                <div class="text-danger small mt-1">{{ err }}</div>
+            {% endfor %}
+        </div>
+
+        <!-- ======== Блок выбора ранга ======== -->
+        {% if market_item and market_item.max_rank|default:0 > 0 %}
+            <div class="mb-3 p-3 border rounded bg-light">
+
+                <label class="fw-bold d-block mb-2">Сейчас отслеживается ранг:</label>
+
+                {% if item.min_rank == 0 %}
+                    <span class="badge bg-secondary">Min (0)</span>
+                {% else %}
+                    <span class="badge bg-success">Max ({{ market_item.max_rank }})</span>
+                {% endif %}
+
+                <hr>
+
+                <label class="form-label d-block mb-2">Выбрать ранг:</label>
+
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input"
+                           type="radio"
+                           name="rank_choice"
+                           id="rank_min"
+                           value="min"
+                           {% if item.min_rank == 0 %}checked{% endif %}>
+                    <label class="form-check-label" for="rank_min">Минимальный (0)</label>
+                </div>
+
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input"
+                           type="radio"
+                           name="rank_choice"
+                           id="rank_max"
+                           value="max"
+                           {% if item.min_rank > 0 %}checked{% endif %}>
+                    <label class="form-check-label" for="rank_max">Максимальный ({{ market_item.max_rank }})</label>
+                </div>
+
+                <!-- скрытые поля -->
+                <input type="hidden" name="min_rank" id="id_min_rank" value="{{ item.min_rank }}">
+                <input type="hidden" name="max_rank" id="id_max_rank" value="{{ item.max_rank }}">
+            </div>
+
+            <script>
+                (function(){
+                    const maxRank = {{ market_item.max_rank }};
+                    const minField = document.getElementById('id_min_rank');
+                    const maxField = document.getElementById('id_max_rank');
+
+                    function apply(choice) {
+                        if (choice === "min") {
+                            minField.value = 0;
+                            maxField.value = 0;
+                        } else {
+                            minField.value = maxRank;
+                            maxField.value = maxRank;
+                        }
+                    }
+
+                    document.addEventListener("change", evt => {
+                        if (evt.target.name === "rank_choice") {
+                            apply(evt.target.value);
+                        }
+                    });
+
+                    document.addEventListener("DOMContentLoaded", () => {
+                        const c = document.querySelector("input[name='rank_choice']:checked");
+                        if (c) apply(c.value);
+                    });
+                })();
+            </script>
+        {% endif %}
+        <!-- ======== конец блока рангов ======== -->
+
+        <div class="d-flex justify-content-between mt-4">
+            <a href="{% url 'tracker-items' %}" class="btn btn-secondary">Отмена</a>
+            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

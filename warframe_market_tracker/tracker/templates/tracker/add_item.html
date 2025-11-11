@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Добавить предмет — Warframe Tracker{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">Добавить новый предмет для отслеживания</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" class="mt-3">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for err in form.non_field_errors %}
+                        <div>{{ err }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+            {{ form.item_url_name }}
+            {% for error in form.item_url_name.errors %}
+                <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+
+            <div class="mb-3 position-relative">
+                <label for="id_name" class="form-label">Название предмета</label>
+                {{ form.name }}
+                {% for error in form.name.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+                <div id="autocomplete-results" class="list-group position-absolute w-100" style="z-index:1000;"></div>
+            </div>
+            <div class="mb-3">
+                <label for="id_target_price" class="form-label">Целевая цена (платина)</label>
+                {{ form.target_price }}
+                {% for error in form.target_price.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div class="mb-3">
+                <label for="id_chat_id" class="form-label">Telegram chat ID</label>
+                {{ form.chat_id }}
+                {% for error in form.chat_id.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+
+            <div id="rank-fields" style="display:none;">
+                <label class="form-label d-block mb-2">Ранг мода:</label>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="rank_choice" id="rank_min" value="min">
+                    <label class="form-check-label" for="rank_min">Минимальный</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="rank_choice" id="rank_max" value="max" checked>
+                    <label class="form-check-label" for="rank_max">Максимальный</label>
+                </div>
+
+                <!-- Скрытые поля для передачи в форму -->
+                <input type="hidden" name="min_rank" id="id_min_rank" value="0">
+                <input type="hidden" name="max_rank" id="id_max_rank" value="0">
+            </div>
+
+            <button type="submit" class="btn btn-success">Добавить</button>
+            <button type="reset" class="btn btn-outline-danger ms-2">Очистить</button>
+
+            <a href="{% url 'tracker-items' %}" class="btn btn-secondary ms-2">Назад к списку</a>
+        </form>
+    </div>
+</div>
+
+<script src="{% static 'tracker/autocomplete.js' %}"></script>
+{% endblock %}

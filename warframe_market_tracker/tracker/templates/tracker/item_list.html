@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Мои предметы{% endblock %}
+{% block content %}
+<h2 class="mb-4">Отслеживаемые предметы</h2>
+<a href="{% url 'tracker-add' %}" class="btn btn-primary mb-3">➕ Добавить предмет</a>
+
+<table class="table table-striped align-middle">
+    <thead class="table-dark">
+        <tr>
+            <th>Название</th>
+            <th>Целевая цена</th>
+            <th>Мин. цена</th>
+            <th>Средняя цена</th>
+            <th>Действия</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item.name }}</td>
+            <td>{{ item.target_price }}</td>
+            <td>{{ item.last_min_price|default:"—" }}</td>
+            <td>{{ item.last_avg_price|default:"—" }}</td>
+            <td>
+                <a href="{% url 'tracker-edit' item.id %}" class="btn btn-sm btn-outline-primary me-1">✏️</a>
+                <a href="{% url 'tracker-delete' item.id %}" class="btn btn-sm btn-outline-danger"
+                   onclick="return confirm('Удалить {{ item.name }}?');">🗑</a>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="text-center text-muted">Нет отслеживаемых предметов</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
