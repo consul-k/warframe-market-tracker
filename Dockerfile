@@ -14,4 +14,4 @@ ENV PYTHONUNBUFFERED=1
 # Collect static files
 RUN python warframe_market_tracker/manage.py collectstatic --noinput
 
-CMD ["gunicorn", "warframe_market_tracker.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "warframe_market_tracker.warframe_market_tracker.wsgi:application", "--bind", "0.0.0.0:8000"]
