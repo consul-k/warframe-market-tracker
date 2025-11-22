@@ -1,6 +1,8 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from .models import TrackedItem, MarketItem
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 
 class TrackedItemForm(forms.ModelForm):
     class Meta:
@@ -78,3 +80,16 @@ class TrackedItemForm(forms.ModelForm):
                 raise ValidationError(f"Максимальный ранг не может быть больше {mi.max_rank}.")
 
         return cleaned
+
+class CustomUserCreationForm(UserCreationForm):
+    email = forms.EmailField(required=True, label="Email")
+
+    class Meta:
+        model = User
+        fields = ("username", "email", "password1", "password2")
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise ValidationError("Пользователь с таким email уже существует")
+        return email

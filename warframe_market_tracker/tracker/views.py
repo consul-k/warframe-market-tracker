@@ -1,10 +1,20 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from .models import TrackedItem, MarketItem
 from .forms import TrackedItemForm
+from .forms import CustomUserCreationForm
 from django.views.decorators.http import require_GET
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.mail import send_mail
+from django.contrib.auth.models import User
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sites.shortcuts import get_current_site
+from django.urls import reverse
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
 
+@login_required
 def index(request):
     return render(request, "tracker/index.html")
 
@@ -131,3 +141,52 @@ def autocomplete_items(request):
             for item in qs
         ]
     return JsonResponse(results, safe=False)
+
+def register(request):
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_active = False
+            user.save()
+
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            activation_link = request.build_absolute_uri(
+                reverse('activate', kwargs={'uidb64': uid, 'token': token})
+            )
+            
+            send_mail(
+                "Подтверждение регистрации",
+                f"Для активации аккаунта перейдите по ссылке:\n{activation_link}",
+                from_email=None,
+                recipient_list=[user.email],
+            )
+
+            messages.success(request, "Аккаунт создан. Проверьте почту для подтверждения.")
+            return redirect('login')  # важный redirect
+    else:
+        form = CustomUserCreationForm()
+
+    return render(request, 'tracker/register.html', {'form': form})
+
+
+def activate(request, uidb64, token):
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+    except Exception:
+        user = None
+
+    if user and default_token_generator.check_token(user, token):
+        user.is_active = True
+        user.save()
+        messages.success(request, "Email подтверждён. Теперь вы можете войти.")
+        return redirect('login')
+    else:
+        messages.error(request, "Ссылка недействительна или уже использована.")
+        return redirect('login')
+
+@login_required
+def profile(request):
+    return render(request, 'tracker/profile.html')

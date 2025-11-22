@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<h2>Личный кабинет</h2>
+<p>Добро пожаловать, {{ request.user.username }}!</p>
+<p>Позже здесь будут настройки отслеживания и Telegram.</p>
+{% endblock %}

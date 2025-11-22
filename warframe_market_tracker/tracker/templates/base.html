@@ -10,8 +10,20 @@
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="#">Warframe Tracker</a>
+        <div class="container-fluid d-flex justify-content-between">
+            <a class="navbar-brand" href="/">Warframe Tracker</a>
+            <div>
+                {% if user.is_authenticated %}
+                    <a class="btn btn-secondary" href="{% url 'profile' %}">Профиль</a>
+                    <form action="{% url 'logout' %}" method="post" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link p-0 m-0">Выйти</button>
+                    </form>
+                {% else %}
+                    <a class="btn btn-primary" href="{% url 'login' %}">Войти</a>
+                    <a class="btn btn-success" href="{% url 'register' %}">Регистрация</a>
+                {% endif %}
+            </div>
         </div>
     </nav>
 
