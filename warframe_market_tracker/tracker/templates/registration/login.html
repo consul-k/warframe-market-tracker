@@ -8,4 +8,7 @@
     <button class="btn btn-primary" type="submit">Войти</button>
 </form>
 <p class="mt-2">Нет аккаунта? <a href="{% url 'register' %}">Регистрация</a></p>
+<p class="mt-2">
+    <a href="{% url 'password_reset' %}">Забыли пароль?</a>
+</p>
 {% endblock %}
