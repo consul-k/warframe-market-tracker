@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  web:
+    image: consulk/warframe-market-tracker:latest
+    container_name: warframe_tracker
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "8001:8000"
+    volumes:
+      - static_volume:/static
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - static_volume:/static
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+
+volumes:
+  static_volume:
