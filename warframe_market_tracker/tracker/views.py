@@ -2,19 +2,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from .models import TrackedItem, MarketItem
 from .forms import TrackedItemForm
-from .forms import CustomUserCreationForm
 from django.views.decorators.http import require_GET
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.core.mail import send_mail
-from django.contrib.auth.models import User
-from django.contrib.auth.tokens import default_token_generator
-from django.contrib.sites.shortcuts import get_current_site
-from django.urls import reverse
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes
 
-@login_required
 def index(request):
     return render(request, "tracker/index.html")
 
@@ -187,6 +177,5 @@ def activate(request, uidb64, token):
         messages.error(request, "Ссылка недействительна или уже использована.")
         return redirect('login')
 
-@login_required
 def profile(request):
     return render(request, 'tracker/profile.html')

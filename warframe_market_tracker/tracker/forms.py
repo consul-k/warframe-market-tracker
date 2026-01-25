@@ -1,9 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from .models import TrackedItem, MarketItem
-from django.contrib.auth.forms import UserCreationForm, SetPasswordForm
-from django.contrib.auth.models import User
-from .validators import validate_not_same_password
 
 class TrackedItemForm(forms.ModelForm):
     class Meta:
@@ -81,26 +78,3 @@ class TrackedItemForm(forms.ModelForm):
                 raise ValidationError(f"Максимальный ранг не может быть больше {mi.max_rank}.")
 
         return cleaned
-
-class CustomUserCreationForm(UserCreationForm):
-    email = forms.EmailField(required=True, label="Email")
-
-    class Meta:
-        model = User
-        fields = ("username", "email", "password1", "password2")
-
-    def clean_email(self):
-        email = self.cleaned_data.get('email')
-        if User.objects.filter(email=email).exists():
-            raise ValidationError("Пользователь с таким email уже существует")
-        return email
-
-class CustomSetPasswordForm(SetPasswordForm):
-    def clean(self):
-        cleaned_data = super().clean()
-        new_password = cleaned_data.get("new_password1")
-
-        if new_password:
-            validate_not_same_password(new_password, user=self.user)
-
-        return cleaned_data
