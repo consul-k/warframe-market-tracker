@@ -4,24 +4,39 @@ from .models import TrackedItem, MarketItem
 from .forms import TrackedItemForm
 from django.views.decorators.http import require_GET
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from .models import TelegramAuthToken
+from django.contrib.auth import login, logout
+
 
 def index(request):
+    if request.user.is_authenticated:
+        return redirect("tracker-items")
     return render(request, "tracker/index.html")
 
+
+@login_required
+def logout_view(request):
+    logout(request)
+    return redirect("tracker-index")
+
+
+@login_required
 def item_list(request):
-    items = TrackedItem.objects.all()
+    items = TrackedItem.objects.filter(user=request.user)
     return render(request, "tracker/item_list.html", {"items": items})
 
+
+@login_required
 def add_item(request):
     if request.method == "POST":
-        form = TrackedItemForm(request.POST)
+        form = TrackedItemForm(request.POST, initial={"user": request.user})
 
         if form.is_valid():
             name = form.cleaned_data.get("name", "").strip()
             item_url_name = form.cleaned_data.get("item_url_name", "").strip()
 
-            # --- 1. Проверяем, что предмет выбран через autocomplete ---
-            mi = None
+            # --- Проверяем предмет ---
             if item_url_name:
                 mi = MarketItem.objects.filter(item_url_name=item_url_name).first()
             else:
@@ -31,12 +46,11 @@ def add_item(request):
                 form.add_error("name", "Выберите предмет из списка подсказок.")
                 return render(request, "tracker/add_item.html", {"form": form})
 
-            # --- 2. Создаем объект, но не сохраняем ---
             obj = form.save(commit=False)
             obj.item_url_name = mi.item_url_name
-            obj.name = mi.item_name   # гарантируем корректное имя
+            obj.name = mi.item_name
 
-            # --- 3. Обрабатываем выбор ранга ---
+            # --- Ранг ---
             rank_choice = request.POST.get("rank_choice", "max")
 
             if mi.max_rank and mi.max_rank > 0:
@@ -50,40 +64,40 @@ def add_item(request):
                 obj.min_rank = None
                 obj.max_rank = None
 
-            # --- 4. Сохраняем ---
+            obj.user = request.user
             obj.save()
 
             messages.success(request, "Предмет успешно добавлен!")
             return redirect("tracker-items")
 
         messages.error(request, "Проверьте введённые данные.")
+
     else:
-        form = TrackedItemForm()
+        form = TrackedItemForm(initial={"user": request.user})
 
     return render(request, "tracker/add_item.html", {"form": form})
 
+
+@login_required
 def edit_item(request, item_id):
-    item = get_object_or_404(TrackedItem, id=item_id)
+    item = get_object_or_404(TrackedItem, id=item_id, user=request.user)
 
     if request.method == "POST":
-        form = TrackedItemForm(request.POST, instance=item)
+        form = TrackedItemForm(request.POST, instance=item, initial={"user": request.user})
+
         if form.is_valid():
-            # Название и URL не редактируем вручную
-            name = item.name
-            item_url_name = item.item_url_name
-
-            # Обновляем только редактируемые поля
             item.target_price = form.cleaned_data.get("target_price")
-            item.chat_id = form.cleaned_data.get("chat_id")
 
-            # --- Проверяем выбор ранга
-            rank_choice = request.POST.get("rank_choice")  # может быть 'min' или 'max'
+            item_url_name = item.item_url_name
+            rank_choice = request.POST.get("rank_choice")
+
             market_item = MarketItem.objects.filter(item_url_name=item_url_name).first()
-            rank_changed_message = None  # сообщение для пользователя
+            rank_changed_message = None
 
             if rank_choice and market_item:
+
                 if rank_choice == "min":
-                    if item.max_rank != 0:  # чтобы не показывать сообщение без необходимости
+                    if item.max_rank != 0:
                         rank_changed_message = "Отслеживаемый ранг изменён на <b>Минимальный</b>."
                     item.min_rank = 0
                     item.max_rank = 0
@@ -94,88 +108,111 @@ def edit_item(request, item_id):
                     item.min_rank = market_item.max_rank
                     item.max_rank = market_item.max_rank
 
-            # Сохраняем изменения
             item.save()
 
-            # Формируем сообщение пользователю
             if rank_changed_message:
                 messages.success(request, f"Изменения сохранены. {rank_changed_message}")
             else:
                 messages.success(request, "Изменения сохранены.")
 
             return redirect("tracker-items")
+
         else:
             messages.error(request, "Исправьте ошибки в форме.")
+
     else:
-        form = TrackedItemForm(instance=item)
+        form = TrackedItemForm(instance=item, initial={"user": request.user})
 
     market_item = MarketItem.objects.filter(item_url_name=item.item_url_name).first()
-    return render(request, "tracker/edit_item.html", {"form": form, "item": item, "market_item": market_item})
 
+    return render(
+        request,
+        "tracker/edit_item.html",
+        {
+            "form": form,
+            "item": item,
+            "market_item": market_item
+        }
+    )
+
+
+@login_required
 def delete_item(request, item_id):
-    item = get_object_or_404(TrackedItem, id=item_id)
+    item = get_object_or_404(TrackedItem, id=item_id, user=request.user)
     item.delete()
-    # После удаления возвращаемся к списку
     return redirect("tracker-items")
+
 
 @require_GET
 def autocomplete_items(request):
-    q = request.GET.get('q', '').strip()
+    q = request.GET.get("q", "").strip()
+
     results = []
+
     if len(q) >= 2:
-        # ограничиваем количество результатов для производительности
-        qs = MarketItem.objects.filter(item_name__icontains=q).order_by('item_name')[:12]
-        # возвращаем только поля, которые нужны фронтенду
+        qs = MarketItem.objects.filter(
+            item_name__icontains=q
+        ).order_by("item_name")[:12]
+
         results = [
-            {"name": item.item_name, "url": item.item_url_name, "max_rank": item.max_rank,}
+            {
+                "name": item.item_name,
+                "url": item.item_url_name,
+                "max_rank": item.max_rank,
+            }
             for item in qs
         ]
+
     return JsonResponse(results, safe=False)
 
-def register(request):
-    if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save(commit=False)
-            user.is_active = False
-            user.save()
 
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
-            activation_link = request.build_absolute_uri(
-                reverse('activate', kwargs={'uidb64': uid, 'token': token})
-            )
-            
-            send_mail(
-                "Подтверждение регистрации",
-                f"Для активации аккаунта перейдите по ссылке:\n{activation_link}",
-                from_email=None,
-                recipient_list=[user.email],
-            )
-
-            messages.success(request, "Аккаунт создан. Проверьте почту для подтверждения.")
-            return redirect('login')  # важный redirect
-    else:
-        form = CustomUserCreationForm()
-
-    return render(request, 'tracker/register.html', {'form': form})
-
-
-def activate(request, uidb64, token):
-    try:
-        uid = urlsafe_base64_decode(uidb64).decode()
-        user = User.objects.get(pk=uid)
-    except Exception:
-        user = None
-
-    if user and default_token_generator.check_token(user, token):
-        user.is_active = True
-        user.save()
-        messages.success(request, "Email подтверждён. Теперь вы можете войти.")
-        return redirect('login')
-    else:
-        messages.error(request, "Ссылка недействительна или уже использована.")
-        return redirect('login')
-
+@login_required
 def profile(request):
-    return render(request, 'tracker/profile.html')
+    return render(request, "tracker/profile.html")
+
+
+def telegram_auth_check(request):
+    token_value = request.session.get("telegram_auth_token")
+
+    if not token_value:
+        return redirect("tracker-index")
+
+    try:
+        token = TelegramAuthToken.objects.select_related(
+            "telegram_profile__user"
+        ).get(token=token_value, is_used=True)
+
+    except TelegramAuthToken.DoesNotExist:
+        return render(request, "tracker/waiting.html")
+
+    if not token.telegram_profile or not token.telegram_profile.user:
+        return render(request, "tracker/waiting.html")
+
+    user = token.telegram_profile.user
+    login(request, user)
+
+    del request.session["telegram_auth_token"]
+
+    return redirect("tracker-items")
+
+
+def link_telegram(request):
+
+    if request.user.is_authenticated:
+        return redirect("tracker-items")
+
+    auth_token = TelegramAuthToken.objects.create()
+
+    request.session["telegram_auth_token"] = str(auth_token.token)
+
+    bot_username = "wm_price_tracker_bot"
+
+    telegram_link = f"https://t.me/{bot_username}?start={auth_token.token}"
+
+    return render(
+        request,
+        "tracker/waiting.html",
+        {
+            "telegram_link": telegram_link
+        },
+    )

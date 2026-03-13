@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Привязка Telegram{% endblock %}
+
+{% block content %}
+<h2>Привязка Telegram</h2>
+
+<p>Нажми кнопку ниже, чтобы открыть бота и подтвердить привязку:</p>
+
+<a href="{{ telegram_link }}" class="btn btn-primary">
+    Открыть Telegram
+</a>
+
+<p class="mt-3 text-muted">
+    Ссылка действительна 5 минут.
+</p>
+{% endblock %}

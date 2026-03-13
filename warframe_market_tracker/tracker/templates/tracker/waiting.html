@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Подтверждение Telegram{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center">
+    <div class="card shadow-sm p-5 text-center" style="max-width: 600px; width: 100%;">
+
+        <h2 class="mb-3">Подтвердите вход через Telegram</h2>
+
+        <p class="text-muted mb-4">
+            Откройте бота и нажмите Start.
+            После подтверждения вход произойдёт автоматически.
+        </p>
+
+        <div class="d-grid gap-3 mb-4">
+            <a href="{{ telegram_link }}" target="_blank" class="btn btn-primary btn-lg">
+                Открыть Telegram
+            </a>
+        </div>
+
+        <div class="text-muted">
+            Ожидание подтверждения...
+        </div>
+
+    </div>
+</div>
+
+<script>
+    setInterval(function() {
+        fetch("{% url 'telegram-auth-check' %}")
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                }
+            });
+    }, 3000);
+</script>
+
+{% endblock %}
