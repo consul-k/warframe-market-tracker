@@ -11,7 +11,7 @@ from tracker.models import TrackedItem, Notification
 from tracker.services.market_api import get_item_prices
 
 
-CHECK_INTERVAL = 30  # 30 секунд
+CHECK_INTERVAL = 120  # 30 секунд
 NOTIFY_COOLDOWN = 3600  # 1 час
 
 
