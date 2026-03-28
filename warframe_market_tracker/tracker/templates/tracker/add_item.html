@@ -38,14 +38,6 @@
                 {% endfor %}
             </div>
 
-            <div class="mb-3">
-                <label for="id_chat_id" class="form-label">Telegram chat ID</label>
-                {{ form.chat_id }}
-                {% for error in form.chat_id.errors %}
-                    <div class="text-danger small">{{ error }}</div>
-                {% endfor %}
-            </div>
-
             <div id="rank-fields" style="display:none;">
                 <label class="form-label d-block mb-2">Ранг мода:</label>
                 <div class="form-check form-check-inline">

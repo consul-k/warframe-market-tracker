@@ -2,25 +2,51 @@
 {% block title %}Профиль{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
 
-    <h2>Личный кабинет</h2>
+<h2 class="mb-4">👤 Профиль</h2>
 
-    <p>Добро пожаловать, <strong>{{ request.user.username }}</strong>!</p>
+<div class="card" style="max-width: 500px;">
+    <div class="card-body">
 
-    <p class="text-muted">
-        Telegram-аккаунт успешно привязан.
-    </p>
+        <p>
+            <strong>Имя пользователя:</strong><br>
+            {{ request.user.username }}
+        </p>
 
-    <div class="mt-3">
-        <a href="{% url 'tracker-items' %}" class="btn btn-outline-primary">
-            📋 Мои отслеживаемые предметы
-        </a>
+        <p>
+            <strong>Уведомлений:</strong><br>
+            {{ request.user.notifications.count }}
+        </p>
 
-        <a href="{% url 'logout' %}" class="btn btn-danger">
-            Выйти
-        </a>
+        <p>
+            <strong>Непрочитанных:</strong><br>
+            {{ unread_notifications_count }}
+        </p>
+
+        <p>
+            <strong>Отслеживаемых предметов:</strong><br>
+            {{ items_count }}
+        </p>
+
+        <hr>
+
+        <div class="d-flex gap-2 flex-wrap">
+
+            <a href="{% url 'tracker-items' %}" class="btn btn-primary">
+                📋 Мои предметы
+            </a>
+
+            <a href="{% url 'tracker-check-prices' %}" class="btn btn-warning">
+                🔄 Проверить цены
+            </a>
+
+            <a href="{% url 'logout' %}" class="btn btn-danger">
+                🚪 Выйти
+            </a>
+
+        </div>
+
     </div>
-
 </div>
+
 {% endblock %}

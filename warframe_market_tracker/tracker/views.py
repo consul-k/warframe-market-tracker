@@ -1,18 +1,29 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
-from .models import TrackedItem, MarketItem
-from .forms import TrackedItemForm
-from django.views.decorators.http import require_GET
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from .models import TelegramAuthToken
 from django.contrib.auth import login, logout
+from django.views.decorators.http import require_GET
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+
+from .models import TrackedItem, MarketItem, Notification
+from .forms import TrackedItemForm
+from tracker.services.market_api import get_item_prices
+
+
+def get_unread_count(request):
+    if request.user.is_authenticated:
+        return request.user.notifications.filter(is_read=False).count()
+    return 0
 
 
 def index(request):
     if request.user.is_authenticated:
         return redirect("tracker-items")
-    return render(request, "tracker/index.html")
+
+    return render(request, "tracker/index.html", {
+        "unread_notifications_count": 0
+    })
 
 
 @login_required
@@ -24,19 +35,22 @@ def logout_view(request):
 @login_required
 def item_list(request):
     items = TrackedItem.objects.filter(user=request.user)
-    return render(request, "tracker/item_list.html", {"items": items})
+
+    return render(request, "tracker/item_list.html", {
+        "items": items,
+        "unread_notifications_count": get_unread_count(request)
+    })
 
 
 @login_required
 def add_item(request):
     if request.method == "POST":
-        form = TrackedItemForm(request.POST, initial={"user": request.user})
+        form = TrackedItemForm(request.POST, user=request.user)
 
         if form.is_valid():
             name = form.cleaned_data.get("name", "").strip()
             item_url_name = form.cleaned_data.get("item_url_name", "").strip()
 
-            # --- Проверяем предмет ---
             if item_url_name:
                 mi = MarketItem.objects.filter(item_url_name=item_url_name).first()
             else:
@@ -44,13 +58,15 @@ def add_item(request):
 
             if not mi:
                 form.add_error("name", "Выберите предмет из списка подсказок.")
-                return render(request, "tracker/add_item.html", {"form": form})
+                return render(request, "tracker/add_item.html", {
+                    "form": form,
+                    "unread_notifications_count": get_unread_count(request)
+                })
 
             obj = form.save(commit=False)
             obj.item_url_name = mi.item_url_name
             obj.name = mi.item_name
 
-            # --- Ранг ---
             rank_choice = request.POST.get("rank_choice", "max")
 
             if mi.max_rank and mi.max_rank > 0:
@@ -73,9 +89,12 @@ def add_item(request):
         messages.error(request, "Проверьте введённые данные.")
 
     else:
-        form = TrackedItemForm(initial={"user": request.user})
+        form = TrackedItemForm(user=request.user)
 
-    return render(request, "tracker/add_item.html", {"form": form})
+    return render(request, "tracker/add_item.html", {
+        "form": form,
+        "unread_notifications_count": get_unread_count(request)
+    })
 
 
 @login_required
@@ -83,63 +102,46 @@ def edit_item(request, item_id):
     item = get_object_or_404(TrackedItem, id=item_id, user=request.user)
 
     if request.method == "POST":
-        form = TrackedItemForm(request.POST, instance=item, initial={"user": request.user})
+        form = TrackedItemForm(request.POST, instance=item, user=request.user)
 
         if form.is_valid():
             item.target_price = form.cleaned_data.get("target_price")
 
-            item_url_name = item.item_url_name
             rank_choice = request.POST.get("rank_choice")
-
-            market_item = MarketItem.objects.filter(item_url_name=item_url_name).first()
-            rank_changed_message = None
+            market_item = MarketItem.objects.filter(item_url_name=item.item_url_name).first()
 
             if rank_choice and market_item:
-
                 if rank_choice == "min":
-                    if item.max_rank != 0:
-                        rank_changed_message = "Отслеживаемый ранг изменён на <b>Минимальный</b>."
                     item.min_rank = 0
                     item.max_rank = 0
-
                 elif rank_choice == "max":
-                    if item.max_rank != market_item.max_rank:
-                        rank_changed_message = "Отслеживаемый ранг изменён на <b>Максимальный</b>."
                     item.min_rank = market_item.max_rank
                     item.max_rank = market_item.max_rank
 
             item.save()
-
-            if rank_changed_message:
-                messages.success(request, f"Изменения сохранены. {rank_changed_message}")
-            else:
-                messages.success(request, "Изменения сохранены.")
-
+            messages.success(request, "Изменения сохранены.")
             return redirect("tracker-items")
 
-        else:
-            messages.error(request, "Исправьте ошибки в форме.")
+        messages.error(request, "Исправьте ошибки в форме.")
 
     else:
-        form = TrackedItemForm(instance=item, initial={"user": request.user})
+        form = TrackedItemForm(instance=item, user=request.user)
 
     market_item = MarketItem.objects.filter(item_url_name=item.item_url_name).first()
 
-    return render(
-        request,
-        "tracker/edit_item.html",
-        {
-            "form": form,
-            "item": item,
-            "market_item": market_item
-        }
-    )
+    return render(request, "tracker/edit_item.html", {
+        "form": form,
+        "item": item,
+        "market_item": market_item,
+        "unread_notifications_count": get_unread_count(request)
+    })
 
 
 @login_required
 def delete_item(request, item_id):
     item = get_object_or_404(TrackedItem, id=item_id, user=request.user)
     item.delete()
+    messages.success(request, "Предмет удалён.")
     return redirect("tracker-items")
 
 
@@ -168,51 +170,122 @@ def autocomplete_items(request):
 
 @login_required
 def profile(request):
-    return render(request, "tracker/profile.html")
+    items_count = TrackedItem.objects.filter(user=request.user).count()
 
+    return render(request, "tracker/profile.html", {
+        "items_count": items_count,
+        "unread_notifications_count": get_unread_count(request)
+    })
 
-def telegram_auth_check(request):
-    token_value = request.session.get("telegram_auth_token")
+@login_required
+def check_prices_now(request):
+    items = TrackedItem.objects.filter(user=request.user)
 
-    if not token_value:
-        return redirect("tracker-index")
+    updated = 0
 
-    try:
-        token = TelegramAuthToken.objects.select_related(
-            "telegram_profile__user"
-        ).get(token=token_value, is_used=True)
+    for item in items:
+        try:
+            rank = item.max_rank if item.max_rank is not None else None
+            min_price, avg_price = get_item_prices(item.item_url_name, rank)
 
-    except TelegramAuthToken.DoesNotExist:
-        return render(request, "tracker/waiting.html")
+            item.last_min_price = min_price
+            item.last_avg_price = avg_price
+            item.save(update_fields=["last_min_price", "last_avg_price"])
 
-    if not token.telegram_profile or not token.telegram_profile.user:
-        return render(request, "tracker/waiting.html")
+            updated += 1
 
-    user = token.telegram_profile.user
-    login(request, user)
+        except Exception:
+            continue
 
-    del request.session["telegram_auth_token"]
-
+    messages.success(request, f"Обновлено цен для {updated} предметов.")
     return redirect("tracker-items")
 
 
-def link_telegram(request):
+@login_required
+def notifications_view(request):
+    notifications = request.user.notifications.order_by("-created_at")
 
+    return render(request, "tracker/notifications.html", {
+        "notifications": notifications,
+        "unread_notifications_count": get_unread_count(request)
+    })
+
+
+@login_required
+def mark_notification_read(request, pk):
+    notification = get_object_or_404(
+        Notification,
+        pk=pk,
+        user=request.user
+    )
+
+    notification.is_read = True
+    notification.save(update_fields=["is_read"])
+
+    return redirect("notifications")
+
+
+def register_view(request):
     if request.user.is_authenticated:
         return redirect("tracker-items")
 
-    auth_token = TelegramAuthToken.objects.create()
+    if request.method == "POST":
+        form = UserCreationForm(request.POST)
 
-    request.session["telegram_auth_token"] = str(auth_token.token)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect("tracker-items")
+    else:
+        form = UserCreationForm()
 
-    bot_username = "wm_price_tracker_bot"
+    return render(request, "tracker/register.html", {
+        "form": form,
+        "unread_notifications_count": 0
+    })
 
-    telegram_link = f"https://t.me/{bot_username}?start={auth_token.token}"
 
-    return render(
-        request,
-        "tracker/waiting.html",
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect("tracker-items")
+
+    if request.method == "POST":
+        form = AuthenticationForm(request, data=request.POST)
+
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            return redirect("tracker-items")
+    else:
+        form = AuthenticationForm()
+
+    return render(request, "tracker/login.html", {
+        "form": form,
+        "unread_notifications_count": 0
+    })
+
+@login_required
+def unread_notifications_count_api(request):
+    count = request.user.notifications.filter(is_read=False).count()
+    return JsonResponse({"count": count})
+
+@login_required
+def latest_notifications(request):
+    notifications = request.user.notifications.filter(
+        is_read=False
+    ).order_by("-created_at")[:5]
+
+    data = [
         {
-            "telegram_link": telegram_link
-        },
-    )
+            "id": n.id,
+            "text": n.text,
+        }
+        for n in notifications
+    ]
+
+    return JsonResponse(data, safe=False)
+
+@login_required
+def mark_all_notifications_read(request):
+    request.user.notifications.filter(is_read=False).update(is_read=True)
+    return redirect("notifications")

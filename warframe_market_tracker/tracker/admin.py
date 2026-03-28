@@ -1,19 +1,21 @@
 from django.contrib import admin
-from .models import TrackedItem, TelegramAuthToken, TelegramProfile
+from .models import TrackedItem, MarketItem, Notification
 
 @admin.register(TrackedItem)
 class TrackedItemAdmin(admin.ModelAdmin):
-    list_display = ("name", "target_price", "last_min_price", "last_avg_price", "created_at")
+    list_display = ("name", "user", "target_price", "last_min_price", "last_avg_price", "created_at")
     search_fields = ("name",)
+    list_filter = ("user",)
 
-@admin.register(TelegramAuthToken)
-class TelegramAuthTokenAdmin(admin.ModelAdmin):
-    list_display = ("token", "is_used", "expires_at", "created_at")
-    list_filter = ("is_used",)
-    search_fields = ("token",)
-    readonly_fields = ("token", "created_at")
 
-@admin.register(TelegramProfile)
-class TelegramProfileAdmin(admin.ModelAdmin):
-    list_display = ("telegram_id",)
-    search_fields = ("telegram_id",)
+@admin.register(MarketItem)
+class MarketItemAdmin(admin.ModelAdmin):
+    list_display = ("item_name", "item_url_name", "max_rank", "updated_at")
+    search_fields = ("item_name", "item_url_name")
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("user", "text", "is_read", "created_at")
+    list_filter = ("is_read",)
+    search_fields = ("text",)

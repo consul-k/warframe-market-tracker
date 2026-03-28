@@ -21,6 +21,10 @@ class TrackedItemForm(forms.ModelForm):
             "max_rank": "Максимальный ранг",
         }
 
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+
     def clean_name(self):
         name = (self.cleaned_data.get("name") or "").strip()
         if not name:
@@ -52,9 +56,9 @@ class TrackedItemForm(forms.ModelForm):
         mi = MarketItem.objects.filter(item_name__iexact=name).first()
 
         # получаем текущего пользователя из initial или instance
-        user = self.initial.get("user") or getattr(self.instance, "user", None)
+        user = self.user
         if not user:
-            raise ValidationError("Не удалось определить пользователя для проверки дубликатов.")
+            raise ValidationError("Ошибка формы: пользователь не передан.")
 
         # проверка дубликатов только для текущего пользователя
         qs = TrackedItem.objects.filter(user=user)

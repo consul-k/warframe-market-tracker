@@ -38,7 +38,13 @@
     return;
   }
 
-  input.addEventListener('input', debouncedFetch);
+  input.addEventListener('input', function(e) {
+  // сбрасываем выбранный item_url_name
+  if (hidden) hidden.value = '';
+
+  // продолжаем обычный autocomplete
+  debouncedFetch(e);
+  });
 
   // клик по элементу списка
   list.addEventListener('click', function(ev) {

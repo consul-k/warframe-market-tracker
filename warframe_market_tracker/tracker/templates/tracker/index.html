@@ -9,8 +9,18 @@
 
         <p class="text-muted mb-4">
             Автоматическое отслеживание цен предметов с Warframe.Market<br>
-            Получайте уведомления в Telegram при достижении целевой цены.
+            Получайте уведомления прямо на сайте при достижении цены
         </p>
+
+        <div class="d-grid gap-3">
+            <a href="{% url 'login' %}" class="btn btn-primary btn-lg">
+                🔐 Войти
+            </a>
+
+            <a href="{% url 'register' %}" class="btn btn-outline-secondary btn-lg">
+                Регистрация
+            </a>
+        </div>
 
         {% if user.is_authenticated %}
 
@@ -27,9 +37,7 @@
         {% else %}
 
             <div class="d-grid gap-3">
-                <a href="{% url 'link-telegram' %}" class="btn btn-primary btn-lg">
-                    🔐 Войти через Telegram
-                </a>
+                <p class="text-muted">Авторизация скоро будет обновлена</p>
             </div>
 
         {% endif %}

@@ -1,7 +1,4 @@
-import uuid
 from django.db import models
-from django.utils import timezone
-from datetime import timedelta
 from django.contrib.auth.models import User
 
 class TrackedItem(models.Model):
@@ -20,73 +17,39 @@ class TrackedItem(models.Model):
     class Meta:
         unique_together = ("user", "item_url_name")
 
-class TrackedItemState(models.Model):
-    chat_id = models.CharField("Telegram chat_id", max_length=64)
-    step = models.CharField("Шаг диалога", max_length=32, default="waiting")
-    temp_name = models.CharField("Временное имя предмета", max_length=200, blank=True, null=True)
-    temp_target_price = models.FloatField("Временная целевая цена", blank=True, null=True)
-    updated_at = models.DateTimeField(auto_now=True)
 
 class MarketItem(models.Model):
-    item_name = models.CharField(max_length=255, db_index=True)       # Человекочитаемое имя
-    item_url_name = models.CharField(max_length=255, unique=True)   # Для API
+    item_name = models.CharField(max_length=255, db_index=True)
+    item_url_name = models.CharField(max_length=255, unique=True)
     max_rank = models.PositiveSmallIntegerField(null=True, blank=True)
+
+    min_price = models.FloatField(null=True, blank=True)
+    avg_price = models.FloatField(null=True, blank=True)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.item_name
-    
-def telegram_token_expiry():
-    return timezone.now() + timedelta(minutes=5)
 
-class TelegramProfile(models.Model):
-    telegram_id = models.BigIntegerField(unique=True)
-    telegram_username = models.CharField(max_length=255, blank=True)
-    first_name = models.CharField(max_length=255, blank=True)
-    is_active = models.BooleanField(default=True)
-
-    user = models.OneToOneField(
+class Notification(models.Model):
+    user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        related_name="telegram_profile"
-    )
-    
-class TelegramAuthToken(models.Model):
-    token = models.UUIDField(
-        default=uuid.uuid4,
-        unique=True,
-        editable=False
+        related_name="notifications"
     )
 
-    telegram_profile = models.ForeignKey(
-        "TelegramProfile",
+    text = models.TextField()
+
+    is_read = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    tracked_item = models.ForeignKey(
+        TrackedItem,
         on_delete=models.CASCADE,
         null=True,
-        blank=True,
-        help_text="Заполняется после подтверждения через Telegram"
+        blank=True
     )
-
-    is_used = models.BooleanField(
-        default=False
-    )
-
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
-
-    expires_at = models.DateTimeField(default=telegram_token_expiry)
-
-    def is_valid(self):
-        return (
-            not self.is_used
-            and timezone.now() < self.expires_at
-        )
 
     def __str__(self):
-        return f"AuthToken {self.token}"
-    
-    class Meta:
-        indexes = [
-        models.Index(fields=["token"]),]
+        return f"{self.user} | {self.text[:50]}"

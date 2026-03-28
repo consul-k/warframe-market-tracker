@@ -7,7 +7,7 @@
     <form method="post" novalidate>
         {% csrf_token %}
         <!-- Скрытое поле item_url_name -->
-         <input type="hidden" name="name" value="{{ item.name }}">
+        <input type="hidden" name="name" value="{{ item.name }}">
         {{ form.item_url_name }}
         {% if form.non_field_errors %}
             <div class="alert alert-danger">
@@ -28,15 +28,6 @@
             {{ form.target_price.label_tag }}
             {{ form.target_price }}
             {% for err in form.target_price.errors %}
-                <div class="text-danger small mt-1">{{ err }}</div>
-            {% endfor %}
-        </div>
-
-        <!-- Telegram chat ID -->
-        <div class="mb-3">
-            {{ form.chat_id.label_tag }}
-            {{ form.chat_id }}
-            {% for err in form.chat_id.errors %}
                 <div class="text-danger small mt-1">{{ err }}</div>
             {% endfor %}
         </div>
