@@ -3,18 +3,26 @@ version: "3.9"
 services:
   web:
     image: consulk/warframe-market-tracker:latest
-    container_name: warframe_tracker
     restart: always
     env_file:
       - .env
-    ports:
-      - "8001:8000"
     volumes:
       - static_volume:/static
+      - db_data:/app/warframe_market_tracker
+
+  watcher:
+    image: consulk/warframe-market-tracker:latest
+    restart: always
+    env_file:
+      - .env
+    command: ["python", "/app/price_watcher.py"]
+    depends_on:
+      - web
+    volumes:
+      - db_data:/app/warframe_market_tracker
 
   nginx:
     image: nginx:latest
-    container_name: nginx_proxy
     restart: always
     ports:
       - "80:80"
@@ -26,3 +34,4 @@ services:
 
 volumes:
   static_volume:
+  db_data:
