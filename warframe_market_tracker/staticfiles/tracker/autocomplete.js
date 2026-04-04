@@ -167,4 +167,28 @@
     }
   });
 
+  // reset кнопка — очистка JS-состояния
+document.addEventListener('DOMContentLoaded', () => {
+  const resetBtn = document.querySelector('button[type="reset"]');
+
+  if (!resetBtn) return;
+
+  resetBtn.addEventListener('click', () => {
+    const list = document.getElementById('autocomplete-results');
+    if (list) {
+      list.innerHTML = '';
+      list.style.display = 'none';
+    }
+
+    const hidden = document.getElementById('id_item_url_name');
+    if (hidden) hidden.value = '';
+
+    const rankFields = document.getElementById("rank-fields");
+    if (rankFields) rankFields.style.display = "none";
+
+    // сброс локального состояния
+    window.lastMaxRank = 0;
+  });
+});
+
 })();
