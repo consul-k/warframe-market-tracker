@@ -60,9 +60,16 @@ SQLite
 
 ## Развёртывание (VPS)
 
+### Установка базовых пакетов
+
+```bash
+apt install python3 python3-venv python3-pip nginx git -y
+```
+
 ### 1. Клонирование репозитория
 
 ```bash
+cd /var/www
 git clone https://github.com/consul-k/warframe-market-tracker
 cd warframe-market-tracker
 ```
@@ -77,27 +84,88 @@ pip install -r requirements.txt
 ### 3. Переменные окружения
 
 Создайте файл .env:
+
+```bash
+nano /var/www/warframe-market-tracker/.env
+```
+
 ```env
 DJANGO_SECRET_KEY=your_secret_key
 DJANGO_ALLOWED_HOSTS=your_server_ip,localhost,127.0.0.1
 DEBUG=False
 ```
-### 4. Миграции и статика
+
+### 4. Миграции и статика, заполнение базы данных предметов
 ```bash
 cd warframe_market_tracker
 python manage.py migrate
 python manage.py collectstatic --noinput
+python manage.py load_market_items
 ```
-### 5. Запуск Gunicorn
+
+### 5. Тестовый запуск Gunicorn
 ```bash
-gunicorn warframe_market_tracker.wsgi:application --bind 127.0.0.1:8000
+gunicorn warframe_market_tracker.wsgi:application --bind 0.0.0.0:8000
 ```
-### 6. Настройка Nginx
+Откройте http://IP:8000
+Используется только для проверки, в production не применяется.
+
+### 6. Настройка Gunicorn как systemd сервиса
+
+```bash
+nano /etc/systemd/system/gunicorn.service
+```
+
+```
+[Unit]
+Description=Gunicorn for Django project
+After=network.target
+
+[Service]
+User=root
+Group=www-data
+WorkingDirectory=/var/www/warframe-market-tracker/warframe_market_tracker
+Environment="PATH=/var/www/warframe-market-tracker/venv/bin"
+ExecStart=/var/www/warframe-market-tracker/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    warframe_market_tracker.wsgi:application
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl daemon-reexec
+systemctl daemon-reload
+systemctl start gunicorn
+systemctl enable gunicorn
+```
+
+Для простоты в примерах используется root, однако в production рекомендуется использовать отдельного пользователя (например, www-data).
+
+тестовая проверка:
+
+```bash
+systemctl status gunicorn
+```
+
+### 7. Настройка Nginx
+
+```bash
+nano /etc/nginx/sites-available/default
+```
 
 ```nginx
 server {
-    listen 80;
-    server_name your_server_ip;
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name IP;
+
+    location = /favicon.ico { access_log off; log_not_found off; }
 
     location /static/ {
         alias /var/www/warframe-market-tracker/warframe_market_tracker/staticfiles/;
@@ -105,23 +173,76 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 ```
-### 7. Фоновые сервисы
+
+Проверка конфигурации перед перезапуском:
+```bash
+nginx -t
+systemctl restart nginx
+```
+
+### 8. Фоновые сервисы
 
 ```bash
+nano /etc/systemd/system/price_watcher.service
+```
+
+```
+[Unit]
+Description=Price Watcher Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/warframe-market-tracker/warframe_market_tracker
+Environment="PATH=/var/www/warframe-market-tracker/venv/bin"
+ExecStart=/var/www/warframe-market-tracker/venv/bin/python /var/www/warframe-market-tracker/warframe_market_tracker/price_watcher.py
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl daemon-reload
 systemctl enable price_watcher
 systemctl start price_watcher
+systemctl status price_watcher
 ```
-### 8. Обновление данных (cron)
+
+### 9. Обновление данных (cron)
 
 ```bash
-0 4 * * * /usr/bin/systemctl stop price_watcher && \
+crontab -e
+```
+
+Добавить:
+```bash
+0 4 * * * bash -c ' \
+systemctl stop price_watcher && \
 cd /var/www/warframe-market-tracker/warframe_market_tracker && \
 /var/www/warframe-market-tracker/venv/bin/python manage.py load_market_items && \
-/usr/bin/systemctl start price_watcher >> /var/log/warframe_cron.log 2>&1
+systemctl start price_watcher \
+' >> /var/log/warframe_cron.log 2>&1
 ```
+cron не поддерживает многострочные команды, поэтому используется bash -c
+
+### Дополнительно (если используется UFW)
+
+Если у вас включён firewall (UFW), необходимо открыть порт 80:
+
+```bash
+ufw allow 80
+ufw allow OpenSSH
+ufw enable
+```
+
 ## Ограничения
 
 - SQLite может блокировать базу при одновременной записи
@@ -140,6 +261,7 @@ cd /var/www/warframe-market-tracker/warframe_market_tracker && \
 ```
 warframe-market-tracker/
 ├── warframe_market_tracker/
+│   ├── warframe_market_tracker/   ← settings, wsgi
 │   ├── tracker/
 │   ├── staticfiles/
 │   ├── manage.py
