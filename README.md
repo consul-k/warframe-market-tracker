@@ -60,9 +60,16 @@ Background:
 
 ## Deployment (VPS)
 
+### Install base packages
+
+```bash
+apt install python3 python3-venv python3-pip nginx git -y
+```
+
 ### 1. Clone repository
 
 ```bash
+cd /var/www
 git clone https://github.com/consul-k/warframe-market-tracker
 cd warframe-market-tracker
 ```
@@ -77,28 +84,90 @@ pip install -r requirements.txt
 ### 3. Configure environment variables
 
 Create .env file:
+
+```bash
+nano /var/www/warframe-market-tracker/.env
+```
+
 ```env
 DJANGO_SECRET_KEY=your_secret_key
 DJANGO_ALLOWED_HOSTS=your_server_ip,localhost,127.0.0.1
 DEBUG=False
 ```
-### 4. Apply migrations and collect static
+
+### 4. Migrations, static files and initial data
 ```bash
 cd warframe_market_tracker
 python manage.py migrate
 python manage.py collectstatic --noinput
+python manage.py load_market_items
 ```
-### 5. Run Gunicorn
-```bash
-gunicorn warframe_market_tracker.wsgi:application --bind 127.0.0.1:8000
-```
-### 6. Configure Nginx
 
-Example config:
+### 5. Test run (Gunicorn)
+
+```bash
+gunicorn warframe_market_tracker.wsgi:application --bind 0.0.0.0:8000
+```
+Open http://IP:8000
+
+Used only for testing. In production, Gunicorn runs via systemd.
+
+### 6. Configure Gunicorn as systemd service
+
+```bash
+nano /etc/systemd/system/gunicorn.service
+```
+
+```
+[Unit]
+Description=Gunicorn for Django project
+After=network.target
+
+[Service]
+User=root
+Group=www-data
+WorkingDirectory=/var/www/warframe-market-tracker/warframe_market_tracker
+Environment="PATH=/var/www/warframe-market-tracker/venv/bin"
+ExecStart=/var/www/warframe-market-tracker/venv/bin/gunicorn \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    warframe_market_tracker.wsgi:application
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl daemon-reexec
+systemctl daemon-reload
+systemctl start gunicorn
+systemctl enable gunicorn
+```
+
+For simplicity, root is used in this example. In production, it is recommended to use a dedicated user (e.g. www-data).
+
+Check status:
+
+```bash
+systemctl status gunicorn
+```
+
+### 7. Configure Nginx
+
+```bash
+nano /etc/nginx/sites-available/default
+```
+
 ```nginx
 server {
-    listen 80;
-    server_name your_server_ip;
+    listen 80 default_server;
+    listen [::]:80 default_server;
+
+    server_name IP;
+
+    location = /favicon.ico { access_log off; log_not_found off; }
 
     location /static/ {
         alias /var/www/warframe-market-tracker/warframe_market_tracker/staticfiles/;
@@ -106,25 +175,76 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 ```
-### 7. Background services
+Static files are served directly by Nginx (from the staticfiles directory created by collectstatic).
 
-Start price watcher:
+Test and restart:
+
 ```bash
+nginx -t
+systemctl restart nginx
+```
+
+### 8. Background services
+
+```bash
+nano /etc/systemd/system/price_watcher.service
+```
+
+```
+[Unit]
+Description=Price Watcher Service
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/var/www/warframe-market-tracker/warframe_market_tracker
+Environment="PATH=/var/www/warframe-market-tracker/venv/bin"
+ExecStart=/var/www/warframe-market-tracker/venv/bin/python /var/www/warframe-market-tracker/warframe_market_tracker/price_watcher.py
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl daemon-reload
 systemctl enable price_watcher
 systemctl start price_watcher
+systemctl status price_watcher
 ```
-### 8. Scheduled updates
+### 9. Scheduled updates
 
-Daily update of market items:
 ```bash
-0 4 * * * /usr/bin/systemctl stop price_watcher && \
+crontab -e
+```
+
+Add:
+```bash
+0 4 * * * bash -c ' \
+systemctl stop price_watcher && \
 cd /var/www/warframe-market-tracker/warframe_market_tracker && \
 /var/www/warframe-market-tracker/venv/bin/python manage.py load_market_items && \
-/usr/bin/systemctl start price_watcher >> /var/log/warframe_cron.log 2>&1
+systemctl start price_watcher \
+' >> /var/log/warframe_cron.log 2>&1
 ```
+
+Cron runs commands via /bin/sh, so bash -c is used for multi-line execution.
+
+### Optional (UFW firewall)
+
+```bash
+ufw allow 80
+ufw allow OpenSSH
+ufw enable
+```
+
 ## Known Limitations
 
 - SQLite may cause database locking under concurrent writes
@@ -143,6 +263,7 @@ cd /var/www/warframe-market-tracker/warframe_market_tracker && \
 ```
 warframe-market-tracker/
 ├── warframe_market_tracker/
+│   ├── warframe_market_tracker/
 │   ├── tracker/
 │   ├── staticfiles/
 │   ├── manage.py
