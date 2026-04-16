@@ -201,6 +201,8 @@ nano /etc/systemd/system/price_watcher.service
 [Unit]
 Description=Price Watcher Service
 After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 User=root
@@ -210,8 +212,6 @@ ExecStart=/var/www/warframe-market-tracker/venv/bin/python /var/www/warframe-mar
 
 Restart=always
 RestartSec=10
-StartLimitIntervalSec=300
-StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target
