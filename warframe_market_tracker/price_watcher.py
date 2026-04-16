@@ -77,6 +77,7 @@ def run_watcher():
 
         for item in items:
             process_item(item)
+            time.sleep(1)
 
         time.sleep(CHECK_INTERVAL)
 
