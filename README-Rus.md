@@ -132,6 +132,7 @@ ExecStart=/var/www/warframe-market-tracker/venv/bin/gunicorn \
     warframe_market_tracker.wsgi:application
 
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -204,6 +205,9 @@ Environment="PATH=/var/www/warframe-market-tracker/venv/bin"
 ExecStart=/var/www/warframe-market-tracker/venv/bin/python /var/www/warframe-market-tracker/warframe_market_tracker/price_watcher.py
 
 Restart=always
+RestartSec=10
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Install]
 WantedBy=multi-user.target
