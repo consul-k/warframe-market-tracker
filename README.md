@@ -134,6 +134,7 @@ ExecStart=/var/www/warframe-market-tracker/venv/bin/gunicorn \
     warframe_market_tracker.wsgi:application
 
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
